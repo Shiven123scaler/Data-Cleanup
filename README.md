@@ -43,7 +43,7 @@ This project bridges that gap.
                          │  HTTP / Python API
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    OpenEnv Interface Layer                   │
+│                    OpenEnv Interface Layer                  │
 │         reset() │ step(action) │ state() │ validate         │
 └────────┬──────────────────────────────────────┬─────────────┘
          │                                      │
