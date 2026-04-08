@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from pydantic import BaseModel
 
@@ -18,6 +19,10 @@ class ResetRequest(BaseModel):
 class StepRequest(BaseModel):
     session_id: str
     action: Action
+
+@app.get("/")
+def read_root():
+    return RedirectResponse(url="/docs")
 
 @app.get("/health")
 def health():
