@@ -1,3 +1,13 @@
+---
+title: Data Cleaning Agent
+emoji: 🧹
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🧹 Data Cleaning Agent — OpenEnv RL Environment
 
 > **An OpenEnv-compatible reinforcement learning environment where an agent learns to transform raw, messy tabular data into clean, structured outputs — evaluated through dense rewards and deterministic graders.**

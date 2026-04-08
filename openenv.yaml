@@ -15,8 +15,8 @@ license: MIT
 server:
   framework: fastapi
   host: "0.0.0.0"
-  port: 8000
-  entrypoint: "uvicorn app.main:app --host 0.0.0.0 --port 8000"
+  port: 7860
+  entrypoint: "uvicorn app.main:app --host 0.0.0.0 --port 7860"
 
 endpoints:
   health: GET /health
