@@ -7,7 +7,7 @@ from app.models import Action, StepResponse, ResetResponse
 
 app = FastAPI(
     title="Data Cleaning Agent",
-    description="FUCK LIFE",
+    description="An OpenEnv-compatible RL environment for training agents to clean messy tabular data.",
     version="1.0.0",
 )
 

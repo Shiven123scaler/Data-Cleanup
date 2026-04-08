@@ -332,26 +332,97 @@ curl http://localhost:8000/health
 ### Run Baseline Script
 
 ```bash
-# Rule-based baseline (no API key needed)
-python baseline/run_baseline.py
+# Rule-based baseline — all tasks (no API key needed)
+python3 baseline/run_baseline.py
 
-# LLM-backed baseline
-OPENAI_API_KEY=sk-... python baseline/run_baseline.py --use-llm
+# Run a specific task
+python3 baseline/run_baseline.py --task easy
+
+# Run against a live API server
+python3 baseline/run_baseline.py --api http://localhost:8000
+
+# Reproducibility check (3 runs per task)
+python3 baseline/run_baseline.py --runs 3
+
+# Quiet mode (summary only)
+python3 baseline/run_baseline.py --quiet
 ```
 
 ---
 
 ## 📊 Baseline Results
 
-Results from the deterministic rule-based baseline agent (averaged over 50 seeded episodes per task):
+Results from the deterministic rule-based baseline agent:
 
-| Task | Avg Score | Avg Steps | Success Rate | Notes |
+| Task | Env Score | Grader Score | Steps Used | Notes |
 |---|---|---|---|---|
-| 🟢 Easy (Null Removal) | `0.97` | 2.1 | 98% | Near-perfect; occasional edge on all-null columns |
-| 🟡 Medium (Date + Dedup) | `0.81` | 9.4 | 74% | Struggles with ambiguous date formats (e.g., `01/02/03`) |
-| 🔴 Hard (Full Clean) | `0.63` | 24.7 | 41% | Email validation and schema normalization remain challenging |
+| 🟢 Easy (Null Removal) | `0.9985` | `1.00` | 1/5 | Single `drop_nulls` achieves perfect grader match |
+| 🟡 Medium (Date + Dedup) | `1.0000` | `1.00` | 2/15 | `normalize_dates` + `drop_duplicates` |
+| 🔴 Hard (Full Clean) | `1.0000` | `0.62` | 1/30 | Env score ≠ grader: phone + status normalisation unsolved by baseline |
 
-> 🔬 **LLM Baseline (GPT-4o):** Achieves `0.91` average on Hard task — demonstrating the environment's value as an LLM evaluation benchmark.
+> 💡 **Env Score** uses the built-in generic grader (null/dup/shape heuristics). **Grader Score** uses the task-specific standalone grader (exact match / partial / multi-factor). The gap on the Hard task shows the environment rewards incremental progress while the grader demands full cleaning.
+
+## 💻 Usage Examples
+
+### Python API (Direct — No Server)
+
+```python
+from app.env import DataCleaningEnv
+from app.models import Action
+
+env = DataCleaningEnv()
+
+# Start an easy task episode
+session_id, obs = env.reset(task_id="easy")
+print(f"Shape: {obs.schema_info.shape}, Nulls: {sum(obs.null_count.values())}")
+
+# Take a cleaning action
+action = Action(operation="drop_nulls", column=None, params={})
+response = env.step(session_id, action)
+print(f"Score: {response.reward_info.score}, Done: {response.reward_info.done}")
+
+# Check final state
+state = env.state(session_id)
+print(f"Final shape: {state['df_shape']}")
+```
+
+### HTTP API (Against Running Server)
+
+```bash
+# 1. Start the server
+uvicorn app.main:app --reload --port 8000
+
+# 2. Reset an episode
+curl -X POST http://localhost:8000/reset \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": "medium"}'
+
+# 3. Take a step (use session_id from reset response)
+curl -X POST http://localhost:8000/step \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "YOUR_SESSION_ID",
+    "action": {"operation": "normalize_dates", "column": "join_date", "params": {}}
+  }'
+
+# 4. Check state
+curl "http://localhost:8000/state?session_id=YOUR_SESSION_ID"
+```
+
+### Using Standalone Graders
+
+```python
+from app.graders.grader_easy import grade
+from app.tasks.task_easy import load_raw_data, load_clean_data
+
+raw = load_raw_data()
+clean = load_clean_data()
+
+# Grade an agent's output
+agent_output = raw.dropna().reset_index(drop=True)
+score = grade(agent_output, clean)
+print(f"Grader score: {score}")  # 1.0 for exact match
+```
 
 ---
 
@@ -360,35 +431,37 @@ Results from the deterministic rule-based baseline agent (averaged over 50 seede
 ```
 data-cleaning-agent/
 ├── app/
-│   ├── main.py               # FastAPI entrypoint
-│   └── env.py                # OpenEnv interface (reset, step, state)
-├── tasks/
-│   ├── base_task.py          # Abstract task definition
-│   ├── easy_task.py          # Null removal task
-│   ├── medium_task.py        # Date normalization + dedup task
-│   └── hard_task.py          # Full cleaning task
-├── graders/
-│   ├── base_grader.py        # Abstract grader
-│   ├── exact_match.py        # Easy task grader
-│   ├── partial_scorer.py     # Medium task grader
-│   └── multi_factor.py       # Hard task grader
-├── utils/
-│   ├── data_generator.py     # Synthetic messy CSV generator
-│   ├── validators.py         # Email, date, dtype validators
-│   └── reward.py             # Reward computation logic
-├── models/
-│   ├── observation.py        # Pydantic Observation model
-│   ├── action.py             # Pydantic Action model
-│   └── reward.py             # Pydantic Reward model
+│   ├── __init__.py
+│   ├── main.py               # FastAPI entrypoint (/health, /reset, /step, /state)
+│   ├── env.py                # OpenEnv interface (DataCleaningEnv: reset, step, state)
+│   ├── models.py             # Pydantic schemas (Observation, Action, RewardInfo, etc.)
+│   ├── state.py              # Episode state helpers
+│   ├── tasks/
+│   │   ├── task_easy.py      # Easy: null row removal
+│   │   ├── task_medium.py    # Medium: date normalisation + dedup
+│   │   └── task_hard.py      # Hard: email, phone, status cleaning
+│   ├── graders/
+│   │   ├── grader_easy.py    # Exact match grader (0.0 or 1.0)
+│   │   ├── grader_medium.py  # Partial scoring (dedup 0.5 + dates 0.5)
+│   │   └── grader_hard.py    # Multi-factor (email + phone + status)
+│   └── utils/
+│       ├── data_loader.py    # CSV loading utilities
+│       └── cleaning_rules.py # Shared cleaning rule definitions
 ├── baseline/
-│   └── run_baseline.py       # Baseline inference script
-├── tests/
-│   ├── test_tasks.py
-│   ├── test_graders.py
-│   └── test_env.py
-├── assets/                   # Diagrams and images for README
-├── openenv.yaml              # OpenEnv metadata
-├── Dockerfile
+│   └── run_baseline.py       # Rule-based baseline agent (supports --api, --runs)
+├── data/
+│   ├── raw_easy.csv          # 250 rows, ~20% nulls
+│   ├── clean_easy.csv        # 200 rows, ground truth
+│   ├── raw_medium.csv        # 220 rows, mixed dates + dupes
+│   ├── clean_medium.csv      # 200 rows, YYYY-MM-DD, no dupes
+│   ├── raw_hard.csv          # 230 rows, mixed phones/status/emails
+│   └── clean_hard.csv        # 184 rows, fully normalised
+├── docs/
+│   ├── planner.md            # 3-day build plan
+│   ├── requirements.md       # Functional & non-functional requirements
+│   └── projectStructure.md   # Original structure design
+├── openenv.yaml              # OpenEnv metadata & task registry
+├── Dockerfile                # Python 3.10-slim, uvicorn, healthcheck
 ├── requirements.txt
 └── README.md
 ```
