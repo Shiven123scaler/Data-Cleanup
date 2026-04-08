@@ -1,0 +1,94 @@
+# OpenEnv Environment Configuration
+# https://openenv.dev/docs/spec
+
+name: data-cleaning-agent
+version: "1.0.0"
+description: >
+  An RL environment where an agent learns to clean messy tabular CSV data
+  through sequential actions — evaluated via dense rewards and deterministic
+  graders across three difficulty tiers.
+
+author: Shiven Kathuria & Harman
+license: MIT
+
+# ── Environment endpoints ────────────────────────────────────────────────
+server:
+  framework: fastapi
+  host: "0.0.0.0"
+  port: 7860
+  entrypoint: "uvicorn app.main:app --host 0.0.0.0 --port 7860"
+
+endpoints:
+  health: GET /health
+  reset:  POST /reset
+  step:   POST /step
+  state:  GET /state
+
+# ── Tasks ────────────────────────────────────────────────────────────────
+tasks:
+  - id: easy
+    name: Null Row Removal
+    description: Remove all rows containing missing or NaN values.
+    difficulty: easy
+    max_steps: 5
+    grader: app.graders.grader_easy
+    data:
+      raw: data/raw_easy.csv
+      clean: data/clean_easy.csv
+
+  - id: medium
+    name: Date Normalisation + Deduplication
+    description: >
+      Normalise all date columns to YYYY-MM-DD format and remove
+      duplicate rows.
+    difficulty: medium
+    max_steps: 15
+    grader: app.graders.grader_medium
+    data:
+      raw: data/raw_medium.csv
+      clean: data/clean_medium.csv
+
+  - id: hard
+    name: Full Dataset Cleaning
+    description: >
+      End-to-end cleaning — email validation, phone number normalisation,
+      and status capitalisation.
+    difficulty: hard
+    max_steps: 30
+    grader: app.graders.grader_hard
+    data:
+      raw: data/raw_hard.csv
+      clean: data/clean_hard.csv
+
+# ── Models ───────────────────────────────────────────────────────────────
+models:
+  observation: app.models.Observation
+  action: app.models.Action
+  reward: app.models.RewardInfo
+
+# ── Reward design ────────────────────────────────────────────────────────
+reward:
+  type: dense
+  range: [0.0, 1.0]
+  formula: "reward(t) = grader_score(state_t) - grader_score(state_{t-1}) - penalty(action_t)"
+  penalties:
+    - trigger: "Dropping >90% of data"
+      value: -0.5
+    - trigger: "Column not found"
+      value: -0.02
+    - trigger: "Failed date parse"
+      value: -0.05
+    - trigger: "Unknown operation"
+      value: -0.02
+
+# ── Baseline ─────────────────────────────────────────────────────────────
+baseline:
+  script: baseline/run_baseline.py
+  type: rule-based
+  requires_api_key: false
+
+# ── Deployment ───────────────────────────────────────────────────────────
+deployment:
+  dockerfile: Dockerfile
+  platform: huggingface-spaces
+  healthcheck: GET /health
