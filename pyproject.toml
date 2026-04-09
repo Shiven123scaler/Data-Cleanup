@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "data-cleaning-agent"
+version = "1.0.0"
+description = "An RL environment where an agent learns to clean messy tabular CSV data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Shiven Kathuria & Harman" }
+]
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.29.0",
+    "pydantic==2.9.0",
+    "pandas==2.2.2",
+    "python-dateutil==2.9.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/Shiven123scaler/Data-Cleanup"
