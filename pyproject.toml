@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Shiven Kathuria & Harman" }
+    { name = "Shiven Kathuria & Harman Singh" }
 ]
 dependencies = [
     "fastapi==0.115.0",
@@ -22,3 +22,4 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/Shiven123scaler/Data-Cleanup"
+Repository = "https://github.com/Shiven123scaler/Data-Cleanup"
