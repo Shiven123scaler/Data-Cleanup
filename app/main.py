@@ -29,7 +29,10 @@ def health():
     return {"status": "ok", "service": "data-cleaning-agent"}
 
 @app.post("/reset", response_model=ResetResponse)
-def reset(request: ResetRequest):
+def reset(request: Optional[ResetRequest] = None):
+    if request is None:
+        request = ResetRequest()
+        
     try:
         session_id, observation = env.reset(
             task_id=request.task_id,
